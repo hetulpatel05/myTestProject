@@ -6,6 +6,6 @@
     <title></title>
 </head>
 <body>
-    <a href="{{ url('redirectgoogle') }}">Login to Google Analytics</a>
+    {{$userdata}}
 </body>
 </html>

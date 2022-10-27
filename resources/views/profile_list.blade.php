@@ -1,11 +1,10 @@
-<table class="table">
+<table class="table" id="tbl_list">
     <tbody>
         @forelse($profileitems as $profile)
             <tr data-profilename="{{ $profile->name }}" data-profileid="{{ $profile->id }}" style="cursor:pointer"
                 class="profile_account">
                 <td>
-                    <div><b>{{ $profile->name }}</b> - <p>{{ $profile->id }}</p>
-                    </div>
+                    <b>{{ $profile->name }}</b><p>{{ $profile->id }}</p>                    
                 </td>
             </tr>
         @empty

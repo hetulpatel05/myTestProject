@@ -49,53 +49,57 @@ class SaveAnalyticsData implements ShouldQueue
         $this->user_analytics_id = $user_analytics_id;
     }
 
-    public function getResults($analytics,$profileId,$from_date,$to_date)
+    public function getResults($type,$analytics,$profileId,$from_date,$to_date)
     {
         /*For Getting the Device Category Data*/
-        $options['dimensions']= 'ga:deviceCategory';
-        $options['filters']= 'ga:deviceCategory==desktop,ga:deviceCategory==mobile,ga:deviceCategory==tablet';
+        if($type=='device_data')
+        {
+            $options['dimensions']= 'ga:deviceCategory';
+            $options['filters']= 'ga:deviceCategory==desktop,ga:deviceCategory==mobile,ga:deviceCategory==tablet';
 
-        $device_categories=$analytics->data_ga->get(
-            'ga:' . $profileId,           
-            $from_date,            
-            $to_date,
-            'ga:users',
-            $options
-        );
-
-        $analytics_data['device_category']=$device_categories;
+            $device_categories=$analytics->data_ga->get(
+                'ga:' . $profileId,           
+                $from_date,            
+                $to_date,
+                'ga:users',
+                $options
+            );
+            $analytics_data['device_category']=$device_categories;
+        }        
         /*Device Category Ends*/
 
         /*Getting General Data Starts*/
-        $metrics = 'ga:users,ga:newUsers,ga:transactionRevenue,ga:bounceRate,ga:sessionDuration';
+        if($type=='general_data')
+        {
+            $metrics = 'ga:users,ga:newUsers,ga:transactionRevenue,ga:bounceRate,ga:sessionDuration';
+            $general_data=$analytics->data_ga->get(
+                'ga:' . $profileId,
+                $from_date,
+                $to_date,
+                $metrics,          
+            );
+            $analytics_data['general_data']=$general_data;
+        }
+        /*Getting General Data Ends*/
 
-        $general_data=$analytics->data_ga->get(
-            'ga:' . $profileId,
-            $from_date,
-            $to_date,
-            $metrics,          
-        );
+         /*Getting User Traffic Data Starts */         
+         if($type=='user_traffic')
+         {
+            $from_traffic_user_date=date('Y-m-d', time()-14*24*60*60); 
+            $to_traffic_user_date=date('Y-m-d', time()-24*60*60);
 
-        $analytics_data['general_data']=$general_data;
-        /*Getting General Data Ends*/       
+            $dimensions = 'ga:date';  //For User Traffic
 
-         /*Getting User Traffic Data Starts */
-        
-         $from_traffic_user_date=date('Y-m-d', time()-14*24*60*60); 
-         $to_traffic_user_date=date('Y-m-d', time()-24*60*60);
+            $traffic_user=$analytics->data_ga->get(
+                'ga:' . $profileId,           
+                $from_traffic_user_date,            
+                $to_traffic_user_date,
+                'ga:users',            //Metrics            
+                array('dimensions' => $dimensions)
+            );
 
-        $dimensions = 'ga:date';  //For User Traffic
-
-        $traffic_user=$analytics->data_ga->get(
-            'ga:' . $profileId,           
-            $from_traffic_user_date,            
-            $to_traffic_user_date,
-            'ga:users',            //Metrics            
-            array('dimensions' => $dimensions)
-        ); 
-
-        $analytics_data['traffic_user']=$traffic_user;
-
+            $analytics_data['traffic_user']=$traffic_user;
+         }
         /*Getting User Traffic Data Ends */
 
         return $analytics_data;
@@ -207,7 +211,7 @@ class SaveAnalyticsData implements ShouldQueue
                 $old_weeek_number=$this->getCurrentWeek($from_old_date);                
             
             /*============================================================================*/
-            $results = $this->getResults($analytics, $this->profile_id,$from_old_date,$to_old_date);
+            $results = $this->getResults('general_data',$analytics, $this->profile_id,$from_old_date,$to_old_date);
             $set_analytics_previous_data=$this->setAnalyticsData($results,$this->user_analytics_id);                
             /*============================================================================*/
 
@@ -248,7 +252,7 @@ class SaveAnalyticsData implements ShouldQueue
             
     }
 
-    public function setandSaveUserTrafficData($results,$analytics_user_id,$from_date,$to_date)    
+    public function setandSaveUserTrafficData($results,$analytics_user_id,$from_date)    
     {
         $users_traffic=$results['traffic_user']->getRows();
         $current_week=$this->getCurrentWeek($from_date);
@@ -257,6 +261,33 @@ class SaveAnalyticsData implements ShouldQueue
         $to_traffic_user_date=date('Y-m-d', time()-24*60*60);
 
         foreach ($users_traffic as $key => $traffic) {            
+            
+            $set_date = strtotime($traffic[0]);
+            $traffic_date=date('Y-m-d',$set_date);
+            $traffic_user=$traffic[1];
+
+            $savedata=new UserAnalyticsTraffic;
+            $savedata->analytics_user_id=$analytics_user_id;
+            $savedata->traffic_date=$traffic_date;
+            $savedata->users=$traffic_user;            
+            $savedata->from_date=$from_traffic_user_date;
+            $savedata->to_date=$to_traffic_user_date;      
+            $savedata->week_number=$current_week;
+            $savedata->save();
+        }
+    }
+
+    public function setupSaveUserTrafficData($results,$analytics_user_id,$from_date)
+    {
+        $users_traffic=$results['traffic_user']->getRows();
+        $current_week=$this->getCurrentWeek($from_date);
+
+        $from_traffic_user_date=date('Y-m-d', time()-14*24*60*60); 
+        $to_traffic_user_date=date('Y-m-d', time()-24*60*60);
+
+        UserAnalyticsTraffic::where('analytics_user_id',$analytics_user_id)->delete();
+
+        foreach ($users_traffic as $key => $traffic) {   
             
             $set_date = strtotime($traffic[0]);
             $traffic_date=date('Y-m-d',$set_date);
@@ -293,31 +324,48 @@ class SaveAnalyticsData implements ShouldQueue
         /*New Accounts Starts*/
         if($this->is_new!='')
         { 
-            /*First Setup the Previous & days records Starts*/
+            /*First Setup the Previous 7 days records Starts*/
             $from_old_date = date('Y-m-d', strtotime($this->from_date. ' - 7 days'));
             $to_old_date = date('Y-m-d', strtotime($this->to_date. ' - 7 days'));
 
-            $results=$this->getResults($analytics,$this->profile_id,$from_old_date,$to_old_date);            
+            $results=$this->getResults('general_data',$analytics,$this->profile_id,$from_old_date,$to_old_date);            
             $set_previous_analytics_data=$this->setAnalyticsData($results,$this->user_analytics_id);
             $this->saveAnalyticsData($set_previous_analytics_data,$from_old_date,$to_old_date);
             /*First Setup the Previous & days records Ends*/
 
             /*Setup the Latest 7 days Records Starts*/
-            $results=$this->getResults($analytics,$this->profile_id,$this->from_date,$this->to_date);
+            $results=$this->getResults('general_data',$analytics,$this->profile_id,$this->from_date,$this->to_date);
             $set_analytics_data=$this->setAnalyticsData($results,$this->user_analytics_id);
             $this->saveAnalyticsData($set_analytics_data,$this->from_date,$this->to_date);
             /*Setup the Latest 7 days Records Ends*/
           
             /*Storing the Device Data Starts*/
+            $results=$this->getResults('device_data',$analytics,$this->profile_id,$this->from_date,$this->to_date);
             $set_analytics_device_data=$this->setDeviceData($results,$this->user_analytics_id);          
             $this->saveAnalyticsDeviceData($set_analytics_device_data,$this->from_date,$this->to_date);
             /*Storing the Device Data Ends*/
 
             /*User Traffic Data Starts*/
-            $set_user_traffic_data=$this->setandSaveUserTrafficData($results,$this->user_analytics_id,$this->from_date,$this->to_date);            
+            $results=$this->getResults('user_traffic',$analytics,$this->profile_id,$this->from_date,$this->to_date);
+            $this->setandSaveUserTrafficData($results,$this->user_analytics_id,$this->from_date);
             /*User Traffic Data ENds*/           
         }
         /*New Accounts Ends*/
+
+        $from_traffic_user_date=date('Y-m-d', time()-14*24*60*60); 
+        $to_traffic_user_date=date('Y-m-d', time()-24*60*60);
+        
+        $check_user_traffic=UserAnalyticsTraffic::select('id')
+        ->where('analytics_user_id',$this->user_analytics_id)
+        ->where('from_date',$from_traffic_user_date)
+        ->where('to_date',$to_traffic_user_date)
+        ->count();
+        
+        if(empty($check_user_traffic))
+        {
+            $results=$this->getResults('user_traffic',$analytics,$this->profile_id,$this->from_date,$this->to_date);
+            $this->setupSaveUserTrafficData($results,$this->user_analytics_id,$this->from_date);
+        }       
         
         $check_analytics_record=AnalyticsData::where('from_date',$this->from_date)
         ->where('to_date',$this->to_date)
@@ -326,11 +374,12 @@ class SaveAnalyticsData implements ShouldQueue
 
         if(empty($check_analytics_record))
         {
-            $results=$this->getResults($analytics,$this->profile_id,$this->from_date,$this->to_date);
+            $results=$this->getResults('general_data',$analytics,$this->profile_id,$this->from_date,$this->to_date);
             $set_analytics_data=$this->setAnalyticsData($results,$this->user_analytics_id);
 
             $this->setupGeneralAnalyticsData($analytics,$set_analytics_data,$this->user_analytics_id);
         }
+
 
         $check_device_record=AnalyticsDeviceCategory::where('from_date',$this->from_date)
                     ->where('to_date',$this->to_date)
@@ -339,7 +388,7 @@ class SaveAnalyticsData implements ShouldQueue
         
         if(empty($check_device_record))
         {
-            $results=$this->getResults($analytics,$this->profile_id,$this->from_date,$this->to_date);
+            $results=$this->getResults('device_data',$analytics,$this->profile_id,$this->from_date,$this->to_date);
             $set_analytics_device_data=$this->setDeviceData($results,$this->user_analytics_id);
             $this->setupDeviceAnalyticsData($set_analytics_device_data,$this->user_analytics_id);
         }

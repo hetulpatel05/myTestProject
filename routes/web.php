@@ -22,6 +22,7 @@ Route::get('redirectgoogle', [MyController::class, 'redirectToGoogle']);
 Route::get('testcallback', [MyController::class, 'handleGoogleCallback']);
 Route::get('dashboard', [MyController::class, 'view']);
 
-Route::get('getdevicedata',[MyController::class, 'getDeviceData'])->name('users.device.details');
 Route::match(['GET','POST'],'analytics-refresh',[MyController::class, 'refreshData'])->name('analytics.refresh');
 Route::post('analytics/account/save',[MyController::class, 'handleGoogleCallback'])->name('save.analytics.account');
+
+Route::post('analytics-data',[MyController::class, 'fetchAnalyticsData'])->name('analytics.data');

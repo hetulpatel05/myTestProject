@@ -1,28 +1,38 @@
+<!DOCTYPE html>
 <html>
-
 <head>
     <title>Account List</title>
     <link href="{{ url('assets/bootstrap.min.css') }}" rel="stylesheet">
 </head>
+<style>
+    .total_list
+    {
+        pointer-events: none;
+        opacity: 0.5;
+    }
+    #my_loader{
+        display: none !important;
+    }
+</style>
 
 <body>
     @if(isset($error))
         <p>User does not have any Google Analytics account.</p>
     @else
         <h2>List of accounts</h2>
-        <div id="mylist">
-            <table class="table">
+       
+        <div id="mylist">           
+            <table class="table" id="tbl_list">
                 <tbody>
                     @forelse($profiles as $profile)
                         <tr data-name="{{ $profile->name }}" data-id="{{ $profile->id }}" style="cursor:pointer"
                             class="analytics_account">
                             <td>
-                                <div><b>{{ $profile->name }}</b> - <p>{{ $profile->id }}</p>
-                                </div>
+                                <b>{{ $profile->name }}</b><p>{{ $profile->id }}</p>                                
                             </td>
                         </tr>
                     @empty
-                        <p>No profiles found for this user.</p>
+                        <p>No Properties found for this user.</p>
                     @endforelse
                 </tbody>
             </table>
@@ -51,15 +61,21 @@
                 },
                 url: saveAccountURL,
                 cache: false,
+                beforeSend: function() {
+                    console.log('launcg');
+                  $("#tbl_list").addClass('total_list');                  
+                },
                 success: function (data) {
+                    $("#tbl_list").removeClass('total_list');                    
                     if (data.success == true) {
-                        console.log(data)                        
+                        // console.log(data)                        
                         $("#mylist").html(data.view);
                     } else {
-                        alert_error(data.message);
+                        alert(data.message);
                     }
                 },
                 fail: function () {
+                    $("#tbl_list").removeClass('total_list');
                     alert_error('Something went wrong.');
                 }
             });
@@ -80,8 +96,12 @@
                 },
                 url: saveAccountURL,
                 cache: false,
-                success: function (data) { 
-
+                beforeSend: function() {
+                  $("#tbl_list").addClass('total_list');
+                  
+                },
+                success: function (data) {
+                    $("#tbl_list").removeClass('total_list');
                     if (data.success == true) {                        
                         // location.reload();
                         window.location.href = '/dashboard';
@@ -90,6 +110,7 @@
                     }
                 },
                 fail: function () {
+                    $("#tbl_list").removeClass('total_list');
                     alert_error('Something went wrong.');
                 }
             });
