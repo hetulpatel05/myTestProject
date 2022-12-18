@@ -47,7 +47,7 @@ class AnalyticsData extends Model
     {
 
         try {
-
+            
             $previous_users = (int)$previous_day_record->number_of_users;
             $latest_users = (int)$latest_record->number_of_users;
 
@@ -73,7 +73,7 @@ class AnalyticsData extends Model
             return $percentage;
 
         } catch (\Exception $e) {
-            return $e->getMessage();
+            dd($e->getMessage());
         }
     }
 }

@@ -13,7 +13,11 @@ class AnalyticsDeviceCategory extends Model
 
     public static function getDeviceData($uid,$campaign_id)
     {
-        $analytics_device_data=AnalyticsDeviceCategory::join('user_analytics','user_analytics.id','analytics_device_category.analytics_user_id')
+
+        try
+        {
+
+            $analytics_device_data=AnalyticsDeviceCategory::join('user_analytics','user_analytics.id','analytics_device_category.analytics_user_id')
         ->where('user_analytics.user_id',$uid)
         ->where('user_analytics.campaign_id',$campaign_id)
         ->select('analytics_device_category.desktop','analytics_device_category.mobile','analytics_device_category.tablet')
@@ -21,12 +25,23 @@ class AnalyticsDeviceCategory extends Model
 
         if(!empty($analytics_device_data))
         {
+            
             $total_devices=$analytics_device_data['desktop']+$analytics_device_data['mobile']+$analytics_device_data['tablet'];
-
-            $desktop_percentage=number_format(($analytics_device_data['desktop']/$total_devices)*100,2);
-            $mobile_percentage=number_format(($analytics_device_data['mobile']/$total_devices)*100,2);
-            $tablet_percentage=number_format(($analytics_device_data['tablet']/$total_devices)*100,2);
-
+            
+            if($total_devices!=0)
+            {
+                $desktop_percentage=number_format(($analytics_device_data['desktop']/$total_devices)*100,2);
+                $mobile_percentage=number_format(($analytics_device_data['mobile']/$total_devices)*100,2);
+                $tablet_percentage=number_format(($analytics_device_data['tablet']/$total_devices)*100,2);
+            }
+            else
+            {
+                $desktop_percentage=0;
+                $mobile_percentage=0;
+                $tablet_percentage=0;
+            }
+            
+            
             $desktop_data['name']='Desktop';
             $desktop_data['y']=(double)$desktop_percentage;
             $desktop_data['color']="#2c5ccb";
@@ -44,6 +59,13 @@ class AnalyticsDeviceCategory extends Model
             $chart_data[]=$tablet_data;
             
             return $chart_data;
+        }
+
+
+        }
+        catch(\Exception $e)
+        {
+            dd($e->getMessage());
         }
     }
 }
